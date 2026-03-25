@@ -1,1 +1,100 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Python Chess AI</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/chessboard-js/1.0.0/chessboard-1.0.0.min.css">
+    <style>
+        body { background: #1a1a1a; color: white; font-family: sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
+        .container { display: flex; gap: 20px; background: #262626; padding: 20px; border-radius: 10px; }
+        #myBoard { width: 450px; }
+        .sidebar { width: 200px; display: flex; flex-direction: column; gap: 15px; }
+        .status { padding: 10px; background: #000; border-left: 4px solid #4CAF50; font-size: 0.9em; }
+        button { padding: 10px; cursor: pointer; background: #444; color: white; border: none; border-radius: 4px; }
+        select { padding: 10px; }
+    </style>
+</head>
+<body>
 
+<div class="container">
+    <div id="myBoard"></div>
+    <div class="sidebar">
+        <div class="status" id="status">Your Turn</div>
+        <label>Difficulty:</label>
+        <select id="diff">
+            <option>Easy</option>
+            <option>Medium</option>
+            <option selected>Impossible</option>
+        </select>
+        <button onclick="location.reload()">Reset Game</button>
+        <div id="history" style="font-size: 0.8em; color: #888; overflow-y: auto; height: 150px;">Moves:</div>
+    </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/chessboard-js/1.0.0/chessboard-1.0.0.min.js"></script>
+
+<script>
+    var board = null;
+    var game = new Chess();
+    var $status = $('#status');
+
+    function onDragStart (source, piece, position, orientation) {
+        if (game.game_over()) return false;
+        if (piece.search(/^b/) !== -1) return false; // User can only move white
+    }
+
+    async function makeAiMove () {
+        $status.html('AI is thinking...');
+        
+        const response = await fetch('/move', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ 
+                fen: game.fen(), 
+                difficulty: $('#diff').val() 
+            })
+        });
+        
+        const data = await response.json();
+        game.load(data.fen);
+        board.position(game.fen());
+        
+        if (game.in_checkmate()) {
+            $status.html('Checkmate! You lost.');
+        } else {
+            $status.html('Your Turn');
+        }
+    }
+
+    function onDrop (source, target) {
+        var move = game.move({
+            from: source,
+            to: target,
+            promotion: 'q'
+        });
+
+        if (move === null) return 'snapback';
+
+        $('#history').append('<div>W: ' + source + '-' + target + '</div>');
+        window.setTimeout(makeAiMove, 250);
+    }
+
+    function onSnapEnd () {
+        board.position(game.fen());
+    }
+
+    var config = {
+        draggable: true,
+        position: 'start',
+        onDragStart: onDragStart,
+        onDrop: onDrop,
+        onSnapEnd: onSnapEnd,
+        pieceTheme: 'https://chessboardjs.com/img/chesspieces/wikipedia/{piece}.png'
+    };
+    
+    board = ChessBoard('myBoard', config);
+</script>
+</body>
+</html>
